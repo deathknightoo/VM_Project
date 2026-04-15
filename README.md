@@ -336,3 +336,214 @@ GetButton((int)Buttons.EnterBtn).gameObject.BindEvent(() =>
 - **Stack 검증:** 팝업을 닫기 전 스택이 비어 있는지 확인
 - **Order 관리:** 수동으로 sorting order를 변경하지 말 것
 - **Footer 액션:** 팝업 소멸 시 자동 Pop되므로 수동 제거 불필요
+
+  # VM3 데이터 통신 관리 레이어
+
+## 📌 개요
+
+`VM3 데이터 통신 관리 레이어`는 클라이언트와 서버 간의 통신을 담당하는 아키텍처입니다.
+
+**DTO_Manager**(서비스 계층)와 **NetworkRepository**(데이터 접근 계층)의 2계층 구조로 구성되며, **Managers** 싱글톤을 통해 시스템 전반의 설정에 접근합니다.
+
+---
+
+## 🔷 시스템 아키텍처 다이어그램
+
+![VM2N 데이터 통신 관리 레이어](attachment:a3e0df7b-7da0-46ee-96de-283f4402f634:VM2N_image1.png)
+
+VM2N 데이터 통신 관리 레이어
+
+---
+
+## 🔷 클래스 역할
+
+### 1. DTO_Manager (서비스 계층 / Application Service Layer)
+
+```
+역할: 유스케이스 조정 및 결과 분배
+책임:
+  - 로그인 / 회원가입 / 인증 등 유스케이스 흐름 조정
+  - NetworkRepository를 통한 API 호출 위임
+  - 응답 코드 확인 및 분기 처리
+  - 결과 데이터를 ApplicationContext에 저장
+  - 콜백을 통해 UI/Scene 계층에 결과 전달
+```
+
+### 2. NetworkRepository (데이터 접근 계층)
+
+```
+역할: HTTP 요청 직접 수행
+책임:
+  - API EndPoint 호출
+  - 서버 응답 파싱
+  - 네트워크 에러 핸들링
+  - 요청/응답 데이터 직렬화
+```
+
+### 3. Managers (전역 싱글톤 컨테이너)
+
+```
+역할: 시스템 전반의 관리자 객체 제공
+포함 요소:
+  - Auth: 인증 토큰 관리
+  - Locale: 언어 설정 관리
+  - UI: UI 시스템 관리
+  - Scene: 씬 전환 관리
+  - 기타 시스템 매니저들
+```
+
+---
+
+## 🔷 클래스 관계
+
+| 관계 유형 | 표기 | 설명 |
+| --- | --- | --- |
+| **Composition** | `*--` | DTO_Manager가 NetworkRepository 인스턴스를 내부에서 직접 생성하고 소유 |
+| **Dependency** | `..>` | 두 클래스 모두 Managers 싱글톤의 정적 속성(Auth, Locale 등)을 참조 |
+
+### 관계 다이어그램
+
+```
+┌─────────────────┐
+│   DTO_Manager   │
+│  (서비스 계층)   │
+└────────┬────────┘
+         │ Composition (소유)
+         ▼
+┌─────────────────┐
+│NetworkRepository│
+│ (데이터 접근)   │
+└────────┬────────┘
+         │
+         ▼
+    [서버 API]
+
+         ┌─────────────────┐
+         │    Managers     │
+         │   (싱글톤)      │
+         └─────────────────┘
+              ▲    ▲
+   Dependency │    │ Dependency
+              │    │
+┌─────────────┘    └─────────────┐
+│                                │
+DTO_Manager              NetworkRepository
+```
+
+---
+
+## 🔷 데이터 흐름
+
+### 요청 흐름 (Request Flow)
+
+```
+UI/Scene (사용자 인터랙션)
+    ↓
+DTO_Manager (유스케이스 조정)
+    ↓
+NetworkRepository (HTTP 요청 생성)
+    ↓
+서버 API (백엔드 처리)
+```
+
+### 응답 흐름 (Response Flow)
+
+```
+서버 API (응답 반환)
+    ↓
+NetworkRepository (응답 파싱)
+    ↓
+DTO_Manager (결과 분배)
+    ↓
+ApplicationContext (사용자 정보 저장)
+    ↓
+UI/Scene (화면 업데이트)
+```
+
+### 전체 데이터 흐름도
+
+![VM2N 전체 데이터 흐름도](attachment:0e22082a-27ef-4544-8fd7-8a00516846d2:VM2N_image2.png)
+
+⚠ 개선사항: 런타임 중에 싱글턴 Manager 객체에 데이터를 저장 관리하는 것은 피해야 함!
+
+---
+
+## 🔷 주요 기능 영역
+
+### 1. 인증 (Authentication)
+
+| 기능 | 설명 |
+| --- | --- |
+| **디바이스 인증** | 기기 고유 식별자 기반 인증 |
+| **전화번호 로그인** | 전화번호를 통한 사용자 인증 |
+| **OTP 로그인** | 일회용 비밀번호 기반 인증 |
+
+### 2. 회원관리 (User Management)
+
+| 기능 | 설명 |
+| --- | --- |
+| **회원가입** | 신규 사용자 등록 |
+| **SMS 인증** | 문자 메시지를 통한 본인 인증 |
+| **비밀번호 재설정** | 분실 비밀번호 복구 |
+
+### 3. 운동 데이터 (Exercise Data)
+
+| 기능 | 설명 |
+| --- | --- |
+| **Mission Workout** | 미션 운동 결과 송수신 |
+| **My Training** | 개인 트레이닝 데이터 관리 |
+| **AI Training** | AI 기반 트레이닝 결과 처리 |
+
+---
+
+## 🏗️ 설계 패턴 분석
+
+### 적용된 패턴
+
+| 패턴 | 적용 위치 | 설명 |
+| --- | --- | --- |
+| **Service Layer Pattern** | DTO_Manager | 유스케이스별 작업을 캡슐화하고 트랜잭션 경계 관리 |
+| **Repository Pattern** | NetworkRepository | 데이터 접근 로직을 추상화하여 서비스 계층과 분리 |
+| **Singleton Pattern** | Managers | 전역적으로 접근 가능한 단일 인스턴스 제공 |
+| **Facade Pattern** | DTO_Manager | 복잡한 네트워크 작업을 단순화된 유스케이스 인터페이스로 제공 |
+| **Composition** | DTO_Manager → NetworkRepository | 강한 소유 관계로 생명주기 관리 |
+
+### 장점
+
+- **관심사 분리**: 서비스 계층(DTO_Manager)과 데이터 접근 계층(NetworkRepository) 명확히 분리
+- **재사용성**: NetworkRepository를 다른 매니저에서도 재사용 가능
+- **테스트 용이성**: 각 계층을 독립적으로 테스트 가능
+- **유지보수성**: API 변경 시 NetworkRepository만 수정하면 됨
+
+### 개선 가능 포인트
+
+- **인터페이스 도입**: INetworkRepository 인터페이스로 의존성 역전 적용 가능
+- **에러 핸들링 표준화**: 공통 에러 처리 레이어 추가 고려
+- **캐싱 전략**: 자주 사용되는 데이터에 대한 캐싱 메커니즘 도입 가능
+
+---
+
+## 📝 사용 예시
+
+### 로그인 요청 흐름
+
+```csharp
+// 1. UI에서 로그인 버튼 클릭
+// 2. DTO_Manager 호출
+await Managers.DTO.LoginWithPhoneNumber(phoneNumber, password);
+
+// 3. DTO_Manager 내부
+public async Task LoginWithPhoneNumber(string phone, string pwd)
+{
+    // NetworkRepository를 통해 API 호출
+    var response = await _networkRepository.PostLogin(phone, pwd);
+
+    // 결과를 ApplicationContext에 저장
+    ApplicationContext.SetUserInfo(response.UserData);
+
+    // 토큰 저장
+    Managers.Auth.SetToken(response.Token);
+}
+```
+
+### 운동 결과 전송 흐름
